@@ -8,6 +8,12 @@ function newRunId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return (crypto as any).randomUUID();
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
+export const metadata = {
+  title: '반응속도 테스트',
+  description: '신호에 반응해 빠르게 클릭! 낮은 ms일수록 더 좋은 기록입니다.',
+  alternates: { canonical: '/games/reaction' },
+  openGraph: { title: '반응속도 테스트', description: '낮은 ms가 더 좋은 기록입니다.', url: '/games/reaction' },
+};
 
 export default function Page() {
   const [phase, setPhase] = useState<'idle' | 'waiting' | 'ready' | 'done'>('idle');
