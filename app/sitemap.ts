@@ -1,0 +1,2 @@
+import type { MetadataRoute } from 'next';
+export default function sitemap(): MetadataRoute.Sitemap { const base = process.env.SITE_URL || 'https://example.com'; const last = new Date().toISOString(); return [ { url: `${base}/`, lastModified: last, changeFrequency: 'weekly', priority: 1 }, { url: `${base}/games/reaction`, lastModified: last, changeFrequency: 'weekly', priority: 0.9 }, { url: `${base}/games/aim`, lastModified: last, changeFrequency: 'weekly', priority: 0.9 }, ]; }
