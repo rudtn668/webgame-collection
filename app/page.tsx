@@ -1,3 +1,9 @@
+export const metadata = {
+  title: '홈',
+  description: '반응속도/AIM 게임을 선택하고 기록을 리더보드에 등록하세요.',
+  alternates: { canonical: '/' },
+};
+
 export default function Home(){
   return (
     <main style={{maxWidth: 900, margin: '0 auto', padding: 24, color: '#eee'}}>
