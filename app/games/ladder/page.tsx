@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";";
 import type { Rung } from "@/lib/ladder";
 
 type Pair = {
@@ -136,8 +135,8 @@ function LadderSVG({
 }
 
 export default function LadderPage() {
-  const searchParams = useSearchParams();
-  const sharedId = searchParams.get("id");
+  const [sharedId, setSharedId] = useState<string | null>(null);
+  
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [count, setCount] = useState(4);
@@ -155,6 +154,11 @@ export default function LadderPage() {
   const canStart =
     names.filter((x) => x.trim().length > 0).length === count &&
     results.filter((x) => x.trim().length > 0).length === count;
+
+    useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  setSharedId(params.get('id'));
+}, []);
 
   // 공유 id로 불러오기
   useEffect(() => {
