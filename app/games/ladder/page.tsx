@@ -1,440 +1,535 @@
-"use client";
+'use client'
 
-import React, { useMemo, useState } from "react";
-import Link from "next/link";
+// =========================
+// components/TopNav.tsx
+// =========================
+import React from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 
-// Rung type representing a ladder rung connecting column indices
-type Rung = { row: number; col: number };
+const navItems = [
+  { href: '/', label: 'Home' },
+  { href: '/games', label: 'Games' },
+  { href: '/games/ladder', label: 'Ladder' },
+]
 
-// Generate ladder rungs with a density and avoiding adjacent overlaps
-function generateLadder(cols: number, rows: number, density = 0.28): Rung[] {
-  const rungs: Rung[] = [];
-  if (cols <= 1) return rungs;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const leftTaken = rungs.some((x) => x.row === r && x.col === c - 1);
-      if (leftTaken) continue;
-      if (Math.random() < density) {
-        rungs.push({ row: r, col: c });
-      }
-    }
-  }
-  return rungs;
-}
+export function TopNav() {
+  const pathname = usePathname()
+  const [open, setOpen] = React.useState(false)
 
-// Walk down a ladder from a starting column, returning the ending column
-function walkLadder(startCol: number, cols: number, rows: number, rungs: Rung[]) {
-  let c = startCol;
-  for (let r = 0; r < rows; r++) {
-    const right = rungs.find((x) => x.row === r && x.col === c);
-    if (right) {
-      c = c + 1;
-      continue;
-    }
-    const left = rungs.find((x) => x.row === r && x.col === c - 1);
-    if (left) {
-      c = c - 1;
-      continue;
-    }
-  }
-  return c;
-}
-
-// Ladder SVG visualization component
-function LadderSVG({
-  names,
-  results,
-  rows,
-  rungs,
-  activeCol,
-  highlightPaths = false,
-}: {
-  names: string[];
-  results: string[];
-  rows: number;
-  rungs: Rung[];
-  activeCol: number | null;
-  highlightPaths?: boolean;
-}) {
-  const cols = names.length;
-  const width = 800;
-  const height = 520;
-  const paddingX = 100;
-  const paddingTop = 60;
-  const paddingBottom = 60;
-
-  const lineX = (colIdx: number) =>
-    paddingX + (colIdx * (width - paddingX * 2)) / (cols - 1 || 1);
-  const lineY = (rowIdx: number) =>
-    paddingTop + (rowIdx * (height - paddingTop - paddingBottom)) / (rows - 1 || 1);
-
-  const pathPoints: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
-  if (highlightPaths && activeCol != null) {
-    let c = activeCol;
-    for (let r = 0; r < rows; r++) {
-      // vertical segment
-      pathPoints.push({
-        x1: lineX(c),
-        y1: r === 0 ? paddingTop : lineY(r - 1),
-        x2: lineX(c),
-        y2: lineY(r),
-      });
-      // horizontal segment to right or left
-      const right = rungs.find((x) => x.row === r && x.col === c);
-      const left = rungs.find((x) => x.row === r && x.col === c - 1);
-      if (right) {
-        pathPoints.push({
-          x1: lineX(c),
-          y1: lineY(r),
-          x2: lineX(c + 1),
-          y2: lineY(r),
-        });
-        c = c + 1;
-      } else if (left) {
-        pathPoints.push({
-          x1: lineX(c),
-          y1: lineY(r),
-          x2: lineX(c - 1),
-          y2: lineY(r),
-        });
-        c = c - 1;
-      }
-    }
-    // final vertical drop
-    pathPoints.push({
-      x1: lineX(c),
-      y1: lineY(rows - 1),
-      x2: lineX(c),
-      y2: height - paddingBottom,
-    });
-  }
+  React.useEffect(() => {
+    setOpen(false) // close on route change
+  }, [pathname])
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full rounded-2xl border shadow-sm">
-      {/* vertical lines */}
-      {Array.from({ length: cols }).map((_, c) => (
-        <line
-          key={`v-${c}`}
-          x1={lineX(c)}
-          y1={paddingTop}
-          x2={lineX(c)}
-          y2={height - paddingBottom}
-          stroke="#d1d5db"
-          strokeWidth={2}
-        />
-      ))}
-      {/* horizontal rungs */}
-      {rungs.map((r, idx) => (
-        <line
-          key={`h-${idx}`}
-          x1={lineX(r.col)}
-          y1={lineY(r.row)}
-          x2={lineX(r.col + 1)}
-          y2={lineY(r.row)}
-          stroke="#9ca3af"
-          strokeWidth={3}
-        />
-      ))}
-      {/* top labels */}
-      {names.map((n, c) => (
-        <text
-          key={`name-${c}`}
-          x={lineX(c)}
-          y={paddingTop - 20}
-          textAnchor="middle"
-          className="fill-gray-800"
-          style={{ fontSize: 14, fontWeight: 700 }}
-        >
-          {n || `P${c + 1}`}
-        </text>
-      ))}
-      {/* bottom labels */}
-      {results.map((n, c) => (
-        <text
-          key={`res-${c}`}
-          x={lineX(c)}
-          y={height - paddingBottom + 24}
-          textAnchor="middle"
-          className="fill-gray-700"
-          style={{ fontSize: 13, fontWeight: 600 }}
-        >
-          {n || `R${c + 1}`}
-        </text>
-      ))}
-      {/* highlighted path */}
-      {highlightPaths &&
-        pathPoints.map((p, i) => (
-          <line
-            key={`path-${i}`}
-            x1={p.x1}
-            y1={p.y1}
-            x2={p.x2}
-            y2={p.y2}
-            stroke="#111827"
-            strokeWidth={4}
-            strokeLinecap="round"
-            opacity={0.9}
-          />
-        ))}
-    </svg>
-  );
-}
-
-// Main Ladder page component
-export default function LadderPage() {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [count, setCount] = useState(4);
-  const [names, setNames] = useState<string[]>(() => Array(4).fill(""));
-  const [results, setResults] = useState<string[]>(() => Array(4).fill(""));
-  const [rows, setRows] = useState(18);
-  const [density, setDensity] = useState(0.28);
-  const [rungs, setRungs] = useState<Rung[]>([]);
-  const [mapping, setMapping] = useState<number[] | null>(null);
-  const [activeCol, setActiveCol] = useState<number | null>(null);
-
-  const canStart =
-    names.filter((x) => x.trim().length > 0).length === count &&
-    results.filter((x) => x.trim().length > 0).length === count;
-
-  const onBuild = () => {
-    const ladder = generateLadder(count, rows, density);
-    setRungs(ladder);
-    const m: number[] = [];
-    for (let c = 0; c < count; c++) {
-      m.push(walkLadder(c, count, rows, ladder));
-    }
-    setMapping(m);
-    setStep(3);
-  };
-
-  const restart = () => {
-    setMapping(null);
-    setRungs([]);
-    setActiveCol(null);
-    setStep(2);
-  };
-
-  const pairs = useMemo(() => {
-    if (!mapping) return [];
-    return mapping.map((toIdx, fromIdx) => ({
-      fromIdx,
-      toIdx,
-      fromName: names[fromIdx] || `P${fromIdx + 1}`,
-      toName: results[toIdx] || `R${toIdx + 1}`,
-    }));
-  }, [mapping, names, results]);
-
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">사다리타기</h1>
-        <Link href="/" className="text-sm text-blue-600 underline">
-          ← 홈으로
-        </Link>
-      </div>
-      <div className="mb-6 flex gap-2">
-        {['인원수 선택', '이름/결과 입력', '결과 확인'].map((label, i) => (
-          <div
-            key={label}
-            className={`rounded-full px-3 py-1 text-sm ${
-              step === i + 1 ? 'bg-black text-white' : 'bg-gray-200 text-gray-700'
-            }`}
-          >
-            {i + 1}. {label}
+    <div className="sticky top-0 z-50 w-full">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 to-transparent" />
+      <nav className="mx-auto max-w-6xl rounded-b-2xl border border-neutral-800/60 bg-neutral-900/70 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/50">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="group inline-flex items-center gap-2">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500" />
+              <span className="text-lg font-semibold tracking-tight text-white">Webgame Collection</span>
+            </Link>
           </div>
-        ))}
-      </div>
-      {step === 1 && (
-        <div className="grid gap-4 rounded-2xl border p-4">
-          <label className="flex items-center gap-3">
-            <span className="w-28 text-sm font-semibold">인원수</span>
-            <input
-              type="number"
-            min={2}
-              max={10}
-              value={count}
-              onChange={(e) => {
-                const v = Math.min(10, Math.max(2, parseInt(e.target.value || '2')));
-                setCount(v);
-                setNames(Array(v).fill(''));
-                setResults(Array(v).fill(''));
-                setMapping(null);
-                setRungs([]);
-                setActiveCol(null);
-              }}
-              className="w-28 rounded-lg border px-3 py-2"
-            />
-            <span className="text-xs text-gray-500">2~10명</span>
-          </label>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-3">
-              <span className="w-28 text-sm font-semibold">가로줄(행)</span>
-              <input
-                type="number"
-                min={6}
-                max={60}
-                value={rows}
-                onChange={(e) =>
-                  setRows(Math.min(60, Math.max(6, parseInt(e.target.value || '18'))))
-                }
-                className="w-28 rounded-lg border px-3 py-2"
-              />
-            </label>
-            <label className="flex items-center gap-3">
-              <span className="w-28 text-sm font-semibold">밀도</span>
-              <input
-                type="number"
-                step="0.02"
-                min={0.06}
-                max={0.6}
-                value={density}
-                onChange={(e) =>
-                  setDensity(
-                    Math.min(
-                      0.6,
-                      Math.max(0.06, parseFloat(e.target.value || '0.28'))
-                    )
-                  )
-                }
-                className="w-28 rounded-lg border px-3 py-2"
-              />
-              <span className="text-xs text-gray-500">가로줄 생성 확률</span>
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStep(2)}
-              className="rounded-xl bg-black px-4 py-2 text-white"
-            >
-              다음 (입력)
-            </button>
-          </div>
-        </div>
-      )}
-      {step === 2 && (
-        <div className="grid gap-6 rounded-2xl border p-4">
-          <div className="grid gap-2">
-            <div className="text-sm font-semibold">참가자 이름</div>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {Array.from({ length: count }).map((_, i) => (
-                <input
-                  key={`n-${i}`}
-                  placeholder={`P${i + 1}`}
-                  value={names[i] ?? ''}
-                  onChange={(e) => {
-                    const v = [...names];
-                    v[i] = e.target.value;
-                    setNames(v);
-                  }}
-                  className="rounded-lg border px-3 py-2"
-                />
-              ))}
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <div className="text-sm font-semibold">하단 결과(상품/벌칙 등)</div>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {Array.from({ length: count }).map((_, i) => (
-                <input
-                  key={`r-${i}`}
-                  placeholder={`R${i + 1}`}
-                  value={results[i] ?? ''}
-                  onChange={(e) => {
-                    const v = [...results];
-                    v[i] = e.target.value;
-                    setResults(v);
-                  }}
-                  className="rounded-lg border px-3 py-2"
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              disabled={!canStart}
-              onClick={onBuild}
-              className={`rounded-xl px-4 py-2 text-white ${
-                canStart ? 'bg-black' : 'bg-gray-400'
-              }`}
-              title={!canStart ? '모든 칸을 입력하세요' : ''}
-            >
-              시작 (사다리 생성)
-            </button>
-            <button
-              onClick={() => setStep(1)}
-              className="rounded-xl border px-4 py-2"
-            >
-              이전
-            </button>
-          </div>
-        </div>
-      )}
-      {step === 3 && (
-        <div className="grid gap-6">
-          <div className="rounded-2xl border p-3">
-            <LadderSVG
-              names={names}
-              results={results}
-              rows={rows}
-              rungs={rungs}
-              activeCol={activeCol}
-              highlightPaths={activeCol != null}
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-600">결과 하이라이트:</span>
-              {names.map((_, i) => (
-                <button
-                  key={`hl-${i}`}
-                  onClick={() => setActiveCol((prev) => (prev === i ? null : i))}
-                  className={`rounded-lg border px-3 py-1 text-sm ${
-                    activeCol === i ? 'bg-black text-white' : 'bg-white'
+
+          {/* Desktop menu */}
+          <div className="hidden items-center gap-1 md:flex">
+            {navItems.map((item) => {
+              const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`relative rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                    active
+                      ? 'text-white'
+                      : 'text-neutral-300 hover:text-white'
                   }`}
                 >
-                  {names[i] || `P${i + 1}`}
-                </button>
-              ))}
-              <button
-                onClick={() => setActiveCol(null)}
-                className="rounded-lg border px-3 py-1 text-sm"
-              >
-                전체 취소
-              </button>
-            </div>
+                  {item.label}
+                  {active && (
+                    <motion.span
+                      layoutId="nav-underline"
+                      className="absolute inset-x-2 -bottom-1 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500"
+                    />
+                  )}
+                </Link>
+              )
+            })}
           </div>
-          {mapping && (
-            <div className="grid gap-2 rounded-2xl border p-4">
-              <div className="text-sm font-semibold">매칭 결과</div>
-              <ul className="grid gap-1">
-                {pairs.map((p, idx) => (
-                  <li
-                    key={`pair-${idx}`}
-                    className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-                  >
-                    <span className="font-semibold">{p.fromName}</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="font-semibold">{p.toName}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={restart}
-              className="rounded-xl bg-black px-4 py-2 text-white"
-            >
-              다시 설정해서 진행
-            </button>
-            <button
-              onClick={onBuild}
-              className="rounded-xl border px-4 py-2"
-              title="같은 인원/입력으로 사다리를 새로 생성합니다"
-            >
-              같은 입력으로 다시 뽑기
-            </button>
-          </div>
+
+          {/* Mobile button */}
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-700 text-neutral-100 md:hidden"
+            aria-label="Toggle Menu"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              {open ? (
+                <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.17 12l6.72-7.71 1.41 1.42z" />
+              ) : (
+                <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
+              )}
+            </svg>
+          </button>
         </div>
-      )}
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="md:hidden"
+            >
+              <div className="border-t border-neutral-800/60 px-2 py-2">
+                {navItems.map((item) => {
+                  const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`block rounded-lg px-3 py-2 text-sm ${
+                        active ? 'bg-neutral-800 text-white' : 'text-neutral-300 hover:bg-neutral-800/70 hover:text-white'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
     </div>
-  );
+  )
+}
+
+// =========================
+// components/LadderGame.tsx
+// =========================
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+
+// 사다리 타입
+type Rung = { row: number; col: number }
+
+function fmtTime(ms: number) {
+  const s = Math.floor(ms / 1000)
+  const mm = String(Math.floor(s / 60)).padStart(2, '0')
+  const ss = String(s % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+}
+
+export default function LadderGame() {
+  const [lanes, setLanes] = useState(5) // 세로줄 개수
+  const [rows, setRows] = useState(14) // 가로줄 레벨 수
+  const [density, setDensity] = useState(0.28) // 가로줄 생성 확률
+  const [rungs, setRungs] = useState<Rung[]>([])
+
+  const [startCol, setStartCol] = useState<number | null>(null)
+  const [isRunning, setIsRunning] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(720)
+  const height = Math.max(420, Math.min(880, rows * 36 + 160))
+
+  // 반응형
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = Math.min(960, Math.max(360, entry.contentRect.width))
+        setWidth(w)
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // 사다리 생성
+  const regenerate = React.useCallback(() => {
+    const newRungs: Rung[] = []
+    for (let r = 0; r < rows; r++) {
+      let prevPlacedAt = -99
+      for (let c = 0; c < lanes - 1; c++) {
+        const canPlace = c - prevPlacedAt > 1 // 같은 줄에 인접 가로줄 금지
+        if (canPlace && Math.random() < density) {
+          newRungs.push({ row: r, col: c })
+          prevPlacedAt = c
+        }
+      }
+    }
+    setRungs(newRungs)
+    setStartCol(null)
+    setIsRunning(false)
+    setElapsed(0)
+    setTracer(null)
+    setPath([])
+  }, [rows, lanes, density])
+
+  useEffect(() => {
+    regenerate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, lanes, density])
+
+  // 좌표계
+  const margin = 40
+  const colGap = (width - margin * 2) / (lanes - 1)
+  const rowGap = (height - margin * 2) / rows
+
+  // 빠르게 결과만 계산 (애니메이션 없이)
+  const hasRung = (row: number, col: number) => rungs.some((r) => r.row === row && r.col === col)
+  const follow = (colStart: number) => {
+    let col = colStart
+    for (let r = 0; r < rows; r++) {
+      if (hasRung(r, col)) {
+        col = col + 1
+      } else if (col - 1 >= 0 && hasRung(r, col - 1)) {
+        col = col - 1
+      }
+    }
+    return col // 도착 컬럼
+  }
+
+  // 애니메이션 상태
+  const [tracer, setTracer] = useState<{
+    x: number
+    y: number
+    col: number
+    row: number
+    mode: 'down' | 'horiz'
+    targetX: number
+    targetY: number
+  } | null>(null)
+  const [path, setPath] = useState<Array<[number, number]>>([])
+  const rafRef = useRef<number | null>(null)
+  const startTimeRef = useRef<number | null>(null)
+
+  const startFrom = (col: number) => {
+    if (isRunning) return
+    const x0 = margin + col * colGap
+    const y0 = margin
+    setPath([[x0, y0]])
+    setTracer({ x: x0, y: y0, col, row: 0, mode: 'down', targetX: x0, targetY: margin + rowGap })
+    setStartCol(col)
+    setIsRunning(true)
+    setElapsed(0)
+    startTimeRef.current = performance.now()
+  }
+
+  // 러너 진행
+  useEffect(() => {
+    if (!isRunning || !tracer) return
+
+    const speedDown = Math.max(180, rowGap * 4) // px/s
+    const speedHoriz = Math.max(220, colGap * 4)
+
+    const tick = (now: number) => {
+      if (!startTimeRef.current) startTimeRef.current = now
+      setElapsed(now - startTimeRef.current)
+
+      setTracer((prev) => {
+        if (!prev) return prev
+        let { x, y, col, row, mode, targetX, targetY } = prev
+
+        const dt = 1 / 60 // 60fps 가정
+        if (mode === 'down') {
+          const step = (speedDown * dt)
+          if (y + step >= targetY) {
+            y = targetY
+            // 가로줄 체크 후 전환
+            if (row < rows) {
+              if (hasRung(row, col)) {
+                // 오른쪽으로 이동
+                const nx = margin + (col + 1) * colGap
+                mode = 'horiz'
+                targetX = nx
+              } else if (col - 1 >= 0 && hasRung(row, col - 1)) {
+                // 왼쪽으로 이동
+                const nx = margin + (col - 1) * colGap
+                mode = 'horiz'
+                targetX = nx
+              } else {
+                // 다음 행으로 직진
+                row = row + 1
+                if (row > rows - 1) {
+                  // 끝
+                  setIsRunning(false)
+                  return { x, y, col, row, mode, targetX, targetY }
+                }
+                mode = 'down'
+                targetY = margin + (row + 1) * rowGap
+              }
+            }
+          } else {
+            y += step
+          }
+        } else if (mode === 'horiz') {
+          const step = (speedHoriz * dt)
+          if (Math.abs(targetX - x) <= step) {
+            x = targetX
+            // 가로 이동 완료 -> 열 변경 후 아래로
+            const newCol = Math.round((x - margin) / colGap)
+            col = newCol
+            mode = 'down'
+            row = row + 1
+            if (row > rows - 1) {
+              setIsRunning(false)
+              return { x, y, col, row, mode, targetX, targetY }
+            }
+            targetY = margin + (row + 1) * rowGap
+          } else {
+            x += Math.sign(targetX - x) * step
+          }
+        }
+
+        setPath((prevPath) => {
+          const last = prevPath[prevPath.length - 1]
+          const nx = Math.round(x * 100) / 100
+          const ny = Math.round(y * 100) / 100
+          if (!last || last[0] !== nx || last[1] !== ny) {
+            return [...prevPath, [nx, ny]]
+          }
+          return prevPath
+        })
+
+        return { x, y, col, row, mode, targetX, targetY }
+      })
+
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }, [isRunning, tracer, rows, rowGap, colGap])
+
+  const reset = () => {
+    setIsRunning(false)
+    setStartCol(null)
+    setElapsed(0)
+    setTracer(null)
+    setPath([])
+  }
+
+  // 전체 맵핑 미리보기
+  const mapping = useMemo(() => {
+    return Array.from({ length: lanes }, (_, i) => ({ from: i, to: follow(i) }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lanes, rows, rungs])
+
+  return (
+    <div ref={containerRef} className="mx-auto mt-6 max-w-6xl px-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-neutral-300">Lanes</span>
+          <input
+            type="number"
+            min={2}
+            max={12}
+            value={lanes}
+            onChange={(e) => setLanes(Math.min(12, Math.max(2, Number(e.target.value) || 2)))}
+            className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
+          />
+          <span className="text-sm text-neutral-300">Rows</span>
+          <input
+            type="number"
+            min={6}
+            max={30}
+            value={rows}
+            onChange={(e) => setRows(Math.min(30, Math.max(6, Number(e.target.value) || 6)))}
+            className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
+          />
+          <span className="text-sm text-neutral-300">Density</span>
+          <input
+            type="range"
+            min={0.1}
+            max={0.5}
+            step={0.01}
+            value={density}
+            onChange={(e) => setDensity(Number(e.target.value))}
+            className="h-2 w-40 cursor-pointer"
+          />
+          <button
+            onClick={regenerate}
+            className="rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800"
+          >
+            사다리 재생성
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => startCol !== null ? startFrom(startCol) : startFrom(0)}
+            disabled={isRunning}
+            className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white disabled:from-neutral-700 disabled:to-neutral-700"
+          >
+            {startCol === null ? '0번에서 시작' : `${startCol}번에서 다시 시작`}
+          </button>
+          <button
+            onClick={reset}
+            className="rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
+          >
+            다시 시작
+          </button>
+        </div>
+      </div>
+
+      {/* 타이머 */}
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm text-neutral-300">진행 시간</div>
+        <motion.div
+          key={isRunning ? 'on' : 'off'}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className={`rounded-full px-3 py-1 text-sm font-mono ${
+            isRunning ? 'bg-indigo-500/20 text-indigo-200' : 'bg-neutral-800 text-neutral-300'
+          }`}
+        >
+          {fmtTime(elapsed)}
+        </motion.div>
+      </div>
+
+      {/* 캔버스(SVG) */}
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2">
+        <svg width={width} height={height} className="mx-auto block">
+          {/* 배경 그리드 */}
+          <defs>
+            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* 세로줄 */}
+          {Array.from({ length: lanes }, (_, i) => (
+            <line
+              key={`v-${i}`}
+              x1={margin + i * colGap}
+              x2={margin + i * colGap}
+              y1={margin}
+              y2={height - margin}
+              stroke="#3f3f46"
+              strokeWidth={3}
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* 가로줄 */}
+          {rungs.map((r, idx) => (
+            <line
+              key={`h-${idx}`}
+              x1={margin + r.col * colGap}
+              x2={margin + (r.col + 1) * colGap}
+              y1={margin + r.row * rowGap}
+              y2={margin + r.row * rowGap}
+              stroke="#71717a"
+              strokeWidth={4}
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* 시작 선택 핀 */}
+          {Array.from({ length: lanes }, (_, i) => (
+            <g key={`pin-${i}`}>
+              <circle
+                cx={margin + i * colGap}
+                cy={margin - 16}
+                r={8}
+                fill={startCol === i ? '#a78bfa' : '#52525b'}
+                className="cursor-pointer"
+                onClick={() => (isRunning ? null : setStartCol(i))}
+              />
+              <text
+                x={margin + i * colGap}
+                y={margin - 26}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#cbd5e1"
+              >
+                {i}
+              </text>
+            </g>
+          ))}
+
+          {/* 진행 경로 */}
+          {path.length > 1 && (
+            <polyline
+              points={path.map((p) => p.join(',')).join(' ')}
+              fill="none"
+              stroke="#a78bfa"
+              strokeWidth={5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+
+          {/* 러너 */}
+          {tracer && (
+            <g>
+              <circle cx={tracer.x} cy={tracer.y} r={7} fill="#ffffff" />
+              <circle cx={tracer.x} cy={tracer.y} r={18} fill="url(#glow)" />
+            </g>
+          )}
+
+          {/* 도착 인덱스 라벨 */}
+          {Array.from({ length: lanes }, (_, i) => (
+            <g key={`end-${i}`}>
+              <text
+                x={margin + i * colGap}
+                y={height - margin + 18}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#94a3b8"
+              >
+                {i}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* 결과 테이블 */}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-800">
+        <div className="bg-neutral-900/60 px-4 py-3 text-sm font-semibold text-white">전체 결과 미리보기</div>
+        <div className="divide-y divide-neutral-800">
+          {mapping.map((m) => (
+            <div key={m.from} className="grid grid-cols-3 items-center px-4 py-2 text-sm">
+              <div className="text-neutral-300">Start: <span className="font-mono text-white">{m.from}</span></div>
+              <div className="text-center text-neutral-500">→</div>
+              <div className="text-right text-neutral-300">End: <span className="font-mono text-white">{m.to}</span></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-3 text-xs text-neutral-500">팁: 위쪽 원형 핀(번호)을 클릭해 시작 지점을 선택하고, “다시 시작”으로 언제든 초기화할 수 있어요.</p>
+    </div>
+  )
+}
+
+// =========================
+// (선택) app/games/ladder/page.tsx 예시
+// =========================
+// 아래 예시는 페이지 파일이 필요할 때 참고용입니다. 프로젝트에 이미 페이지가 있다면 이 블록은 무시하세요.
+export function LadderPageExample() {
+  return (
+    <main className="min-h-screen bg-neutral-950 text-white">
+      <TopNav />
+      <section className="mx-auto max-w-6xl px-4 py-6">
+        <h1 className="mb-2 text-2xl font-bold">사다리 타기</h1>
+        <p className="mb-4 text-neutral-300">애니메이션, 타이머, 전체 매핑 미리보기 지원</p>
+        <LadderGame />
+      </section>
+    </main>
+  )
 }
