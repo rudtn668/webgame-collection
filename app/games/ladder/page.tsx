@@ -10,11 +10,19 @@ import { usePathname } from 'next/navigation'
 function TopNav() {
   const pathname = usePathname()
   const navItems = [
-    { href: '/', label: '← 홈' },
+    { href: '/', label: 'Home' },
+    { href: '/games', label: 'Games' },
+    { href: '/games/ladder', label: 'Ladder' },
   ]
   return (
     <div className="sticky top-0 z-50 w-full">
       <nav className="mx-auto max-w-6xl border-b border-neutral-800 bg-neutral-900/70 backdrop-blur">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Link href="/" className="group inline-flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500" />
+            <span className="text-lg font-semibold tracking-tight text-white">Webgame Collection</span>
+          </Link>
+          <div className="flex items-center gap-1">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
               return (
@@ -279,6 +287,7 @@ export default function Page() {
 
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="mb-2 text-2xl font-bold">사다리 타기</h1>
+        <p className="mb-4 text-neutral-300">입력칸 정렬 + 위치 싱크 수정 + 클릭 즉시 진행</p>
 
         {/* 컨트롤 바 */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
