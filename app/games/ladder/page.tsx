@@ -423,8 +423,8 @@ export default function Page() {
                 key={`h-${idx}`}
                 x1={margin + r.col * colGap}
                 x2={margin + (r.col + 1) * colGap}
-                y1={margin + r.row * rowGap}
-                y2={margin + r.row * rowGap}
+                y1={margin + (r.col + 1)* rowGap}
+                y2={margin + (r.col + 1) * rowGap}
                 stroke="#71717a"
                 strokeWidth={4}
                 strokeLinecap="round"
