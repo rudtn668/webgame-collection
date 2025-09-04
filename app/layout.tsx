@@ -11,9 +11,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <a className="muted" href="/">홈</a>
           <a className="muted" href="/games/reaction">반응속도</a>
           <a className="muted" href="/games/aim">AIM</a>
+                <a className="muted" href="/games/ladder">사다리타기</a>
         </nav>
         <div className="container">{children}</div>
       </body>
-    </html>
+        
+      
+    </htm
   );
 }
