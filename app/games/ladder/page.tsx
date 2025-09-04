@@ -3,10 +3,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
 
 // =========================
-// 상단 네비 (파일 내 로컬 컴포넌트)
+// 상단 네비 (로컬 컴포넌트)
 // =========================
 function TopNav() {
   const pathname = usePathname()
@@ -30,7 +29,6 @@ function TopNav() {
             <span className="text-lg font-semibold tracking-tight text-white">Webgame Collection</span>
           </Link>
 
-          {/* Desktop */}
           <div className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
@@ -44,17 +42,13 @@ function TopNav() {
                 >
                   {item.label}
                   {active && (
-                    <motion.span
-                      layoutId="nav-underline"
-                      className="absolute inset-x-2 -bottom-1 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500"
-                    />
+                    <span className="absolute inset-x-2 -bottom-1 block h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500" />
                   )}
                 </Link>
               )
             })}
           </div>
 
-          {/* Mobile button */}
           <button
             onClick={() => setOpen((v) => !v)}
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-700 text-neutral-100 md:hidden"
@@ -70,41 +64,33 @@ function TopNav() {
           </button>
         </div>
 
-        {/* Mobile menu */}
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="md:hidden"
-            >
-              <div className="border-t border-neutral-800/60 px-2 py-2">
-                {navItems.map((item) => {
-                  const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`block rounded-lg px-3 py-2 text-sm ${
-                        active ? 'bg-neutral-800 text-white' : 'text-neutral-300 hover:bg-neutral-800/70 hover:text-white'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {open && (
+          <div className="md:hidden">
+            <div className="border-t border-neutral-800/60 px-2 py-2">
+              {navItems.map((item) => {
+                const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`block rounded-lg px-3 py-2 text-sm ${
+                      active ? 'bg-neutral-800 text-white' : 'text-neutral-300 hover:bg-neutral-800/70 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </nav>
     </div>
   )
 }
 
 // =========================
-// 사다리 게임 (파일 내 로컬 컴포넌트)
+// 사다리 게임
 // =========================
 type Rung = { row: number; col: number }
 
@@ -115,21 +101,29 @@ function fmtTime(ms: number) {
   return `${mm}:${ss}`
 }
 
-function LadderGame() {
+export default function Page() {
+  // 기본 설정
   const [lanes, setLanes] = useState(5)
   const [rows, setRows] = useState(14)
   const [density, setDensity] = useState(0.28)
   const [rungs, setRungs] = useState<Rung[]>([])
 
-  const [startCol, setStartCol] = useState<number | null>(null)
-  const [isRunning, setIsRunning] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
+  // 라벨 입력 (start/end)
+  const [startLabels, setStartLabels] = useState<string[]>(() => Array.from({ length: lanes }, (_, i) => `P${i + 1}`))
+  const [endLabels, setEndLabels] = useState<string[]>(() => Array.from({ length: lanes }, (_, i) => `A${i + 1}`))
 
+  // 애니메이션/결과
+  const [animate, setAnimate] = useState(true) // false면 즉시 결과
+  const [elapsed, setElapsed] = useState(0)
+  const [isRunning, setIsRunning] = useState(false)
+  const [startCol, setStartCol] = useState<number | null>(null)
+  const [path, setPath] = useState<Array<[number, number]>>([])
+  const [showMapping, setShowMapping] = useState(false) // 결과 테이블 표시
+
+  // 반응형
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(720)
   const height = Math.max(420, Math.min(880, rows * 36 + 160))
-
-  // 반응형
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -143,7 +137,12 @@ function LadderGame() {
     return () => ro.disconnect()
   }, [])
 
-  // 사다리 재생성
+  // 좌표계
+  const margin = 40
+  const colGap = (width - margin * 2) / (lanes - 1)
+  const rowGap = (height - margin * 2) / rows
+
+  // 사다리 생성
   const regenerate = React.useCallback(() => {
     const newRungs: Rung[] = []
     for (let r = 0; r < rows; r++) {
@@ -157,23 +156,37 @@ function LadderGame() {
       }
     }
     setRungs(newRungs)
+    // 요청: 재생성하면 길목(경로) 안 보이게
+    setPath([])
     setStartCol(null)
     setIsRunning(false)
     setElapsed(0)
-    setTracer(null)
-    setPath([])
+    setShowMapping(false)
   }, [rows, lanes, density])
 
+  // lanes 바뀌면 라벨 길이 맞추기
+  useEffect(() => {
+    setStartLabels((prev) => {
+      const next = [...prev]
+      next.length = lanes
+      for (let i = 0; i < lanes; i++) if (!next[i]) next[i] = `P${i + 1}`
+      return next
+    })
+    setEndLabels((prev) => {
+      const next = [...prev]
+      next.length = lanes
+      for (let i = 0; i < lanes; i++) if (!next[i]) next[i] = `A${i + 1}`
+      return next
+    })
+  }, [lanes])
+
+  // 초기/설정 변경 시 재생성
   useEffect(() => {
     regenerate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, lanes, density])
 
-  // 좌표계
-  const margin = 40
-  const colGap = (width - margin * 2) / (lanes - 1)
-  const rowGap = (height - margin * 2) / rows
-
+  // 유틸
   const hasRung = (row: number, col: number) => rungs.some((r) => r.row === row && r.col === col)
   const follow = (colStart: number) => {
     let col = colStart
@@ -183,24 +196,36 @@ function LadderGame() {
     }
     return col
   }
+  const mapping = useMemo(() => Array.from({ length: lanes }, (_, i) => ({ from: i, to: follow(i) })), [lanes, rows, rungs])
 
   // 애니메이션 상태
   const [tracer, setTracer] = useState<{
     x: number; y: number; col: number; row: number; mode: 'down' | 'horiz'; targetX: number; targetY: number
   } | null>(null)
-  const [path, setPath] = useState<Array<[number, number]>>([])
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
 
-  const startFrom = (col: number) => {
-    if (isRunning) return
+  const beginFrom = (col: number) => {
+    // 요청: 숫자 누르면 바로 진행 (버튼 없음)
+    setShowMapping(false)
+    setStartCol(col)
+    setElapsed(0)
+    setPath([])
+
+    if (!animate) {
+      // 즉시 결과 모드
+      setIsRunning(false)
+      setTracer(null)
+      // 선택 경로 없이 테이블만 보여줌
+      setShowMapping(true)
+      return
+    }
+
     const x0 = margin + col * colGap
     const y0 = margin
     setPath([[x0, y0]])
     setTracer({ x: x0, y: y0, col, row: 0, mode: 'down', targetX: x0, targetY: margin + rowGap })
-    setStartCol(col)
     setIsRunning(true)
-    setElapsed(0)
     startTimeRef.current = performance.now()
   }
 
@@ -235,7 +260,9 @@ function LadderGame() {
               } else {
                 row = row + 1
                 if (row > rows - 1) {
+                  // 끝
                   setIsRunning(false)
+                  setShowMapping(true) // 도착 후 결과 표시
                   return { x, y, col, row, mode, targetX, targetY }
                 }
                 mode = 'down'
@@ -252,6 +279,7 @@ function LadderGame() {
             row = row + 1
             if (row > rows - 1) {
               setIsRunning(false)
+              setShowMapping(true) // 도착 후 결과 표시
               return { x, y, col, row, mode, targetX, targetY }
             }
             targetY = margin + (row + 1) * rowGap
@@ -281,214 +309,222 @@ function LadderGame() {
     }
   }, [isRunning, tracer, rows, rowGap, colGap])
 
-  const reset = () => {
+  // 전체 결과 바로보기
+  const showAllResults = () => {
     setIsRunning(false)
-    setStartCol(null)
-    setElapsed(0)
     setTracer(null)
     setPath([])
+    setShowMapping(true)
   }
 
-  const mapping = useMemo(
-    () => Array.from({ length: lanes }, (_, i) => ({ from: i, to: follow(i) })),
-    [lanes, rows, rungs]
-  )
+  // 입력 핸들러
+  const updateStartLabel = (i: number, val: string) =>
+    setStartLabels((prev) => prev.map((v, idx) => (idx === i ? val : v)))
+  const updateEndLabel = (i: number, val: string) =>
+    setEndLabels((prev) => prev.map((v, idx) => (idx === i ? val : v)))
 
-  return (
-    <div ref={containerRef} className="mx-auto mt-6 max-w-6xl px-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-neutral-300">Lanes</span>
-          <input
-            type="number" min={2} max={12} value={lanes}
-            onChange={(e) => setLanes(Math.min(12, Math.max(2, Number(e.target.value) || 2)))}
-            className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
-          />
-          <span className="text-sm text-neutral-300">Rows</span>
-          <input
-            type="number" min={6} max={30} value={rows}
-            onChange={(e) => setRows(Math.min(30, Math.max(6, Number(e.target.value) || 6)))}
-            className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
-          />
-          <span className="text-sm text-neutral-300">Density</span>
-          <input
-            type="range" min={0.1} max={0.5} step={0.01} value={density}
-            onChange={(e) => setDensity(Number(e.target.value))}
-            className="h-2 w-40 cursor-pointer"
-          />
-          <button
-            onClick={regenerate}
-            className="rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800"
-          >
-            사다리 재생성
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => (startCol !== null ? startFrom(startCol) : startFrom(0))}
-            disabled={isRunning}
-            className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white disabled:from-neutral-700 disabled:to-neutral-700"
-          >
-            {startCol === null ? '0번에서 시작' : `${startCol}번에서 다시 시작`}
-          </button>
-          <button
-            onClick={reset}
-            className="rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
-          >
-            다시 시작
-          </button>
-        </div>
-      </div>
-
-      {/* 타이머 */}
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm text-neutral-300">진행 시간</div>
-        <motion.div
-          key={isRunning ? 'on' : 'off'}
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className={`rounded-full px-3 py-1 text-sm font-mono ${
-            isRunning ? 'bg-indigo-500/20 text-indigo-200' : 'bg-neutral-800 text-neutral-300'
-          }`}
-        >
-          {fmtTime(elapsed)}
-        </motion.div>
-      </div>
-
-      {/* 캔버스 */}
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2">
-        <svg width={width} height={height} className="mx-auto block">
-          <defs>
-            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-
-          {/* 세로줄 */}
-          {Array.from({ length: lanes }, (_, i) => (
-            <line
-              key={`v-${i}`}
-              x1={margin + i * colGap}
-              x2={margin + i * colGap}
-              y1={margin}
-              y2={height - margin}
-              stroke="#3f3f46"
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-          ))}
-
-          {/* 가로줄 */}
-          {rungs.map((r, idx) => (
-            <line
-              key={`h-${idx}`}
-              x1={margin + r.col * colGap}
-              x2={margin + (r.col + 1) * colGap}
-              y1={margin + r.row * rowGap}
-              y2={margin + r.row * rowGap}
-              stroke="#71717a"
-              strokeWidth={4}
-              strokeLinecap="round"
-            />
-          ))}
-
-          {/* 시작 핀 */}
-          {Array.from({ length: lanes }, (_, i) => (
-            <g key={`pin-${i}`}>
-              <circle
-                cx={margin + i * colGap}
-                cy={margin - 16}
-                r={8}
-                fill={startCol === i ? '#a78bfa' : '#52525b'}
-                className="cursor-pointer"
-                onClick={() => (isRunning ? null : setStartCol(i))}
-              />
-              <text
-                x={margin + i * colGap}
-                y={margin - 26}
-                textAnchor="middle"
-                fontSize="10"
-                fill="#cbd5e1"
-              >
-                {i}
-              </text>
-            </g>
-          ))}
-
-          {/* 진행 경로 */}
-          {path.length > 1 && (
-            <polyline
-              points={path.map((p) => p.join(',')).join(' ')}
-              fill="none"
-              stroke="#a78bfa"
-              strokeWidth={5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          )}
-
-          {/* 러너 */}
-          {tracer && (
-            <g>
-              <circle cx={tracer.x} cy={tracer.y} r={7} fill="#ffffff" />
-              <circle cx={tracer.x} cy={tracer.y} r={18} fill="url(#glow)" />
-            </g>
-          )}
-
-          {/* 도착 인덱스 라벨 */}
-          {Array.from({ length: lanes }, (_, i) => (
-            <text
-              key={`end-${i}`}
-              x={margin + i * colGap}
-              y={height - margin + 18}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#94a3b8"
-            >
-              {i}
-            </text>
-          ))}
-        </svg>
-      </div>
-
-      {/* 결과 테이블 */}
-      <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-800">
-        <div className="bg-neutral-900/60 px-4 py-3 text-sm font-semibold text-white">전체 결과 미리보기</div>
-        <div className="divide-y divide-neutral-800">
-          {mapping.map((m) => (
-            <div key={m.from} className="grid grid-cols-3 items-center px-4 py-2 text-sm">
-              <div className="text-neutral-300">
-                Start: <span className="font-mono text-white">{m.from}</span>
-              </div>
-              <div className="text-center text-neutral-500">→</div>
-              <div className="text-right text-neutral-300">
-                End: <span className="font-mono text-white">{m.to}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <p className="mt-3 text-xs text-neutral-500">
-        팁: 위쪽 원형 핀(번호)을 클릭해 시작 지점을 선택하고, “다시 시작”으로 언제든 초기화할 수 있어요.
-      </p>
-    </div>
-  )
-}
-
-// =========================
-// 페이지 엔트리
-// =========================
-export default function Page() {
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
       <TopNav />
+
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="mb-2 text-2xl font-bold">사다리 타기</h1>
-        <p className="mb-4 text-neutral-300">애니메이션, 타이머, 매핑 미리보기 지원</p>
-        <LadderGame />
+        <p className="mb-4 text-neutral-300">라벨 입력, 즉시 결과, 클릭 즉시 진행</p>
+
+        {/* 컨트롤 바 */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-neutral-300">Lanes</span>
+            <input
+              type="number" min={2} max={12} value={lanes}
+              onChange={(e) => setLanes(Math.min(12, Math.max(2, Number(e.target.value) || 2)))}
+              className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
+            />
+            <span className="text-sm text-neutral-300">Rows</span>
+            <input
+              type="number" min={6} max={30} value={rows}
+              onChange={(e) => setRows(Math.min(30, Math.max(6, Number(e.target.value) || 6)))}
+              className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
+            />
+            <span className="text-sm text-neutral-300">Density</span>
+            <input
+              type="range" min={0.1} max={0.5} step={0.01} value={density}
+              onChange={(e) => setDensity(Number(e.target.value))}
+              className="h-2 w-40 cursor-pointer"
+            />
+          </div>
+
+          <div className="ml-auto flex items-center gap-3">
+            <label className="flex select-none items-center gap-2 text-sm text-neutral-300">
+              <input
+                type="checkbox"
+                checked={animate}
+                onChange={(e) => setAnimate(e.target.checked)}
+              />
+              애니메이션
+            </label>
+
+            <button
+              onClick={regenerate}
+              className="rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800"
+            >
+              사다리 재생성
+            </button>
+
+            <button
+              onClick={showAllResults}
+              className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white"
+            >
+              결과 바로보기
+            </button>
+          </div>
+        </div>
+
+        {/* 라벨 입력 영역 (Start) */}
+        <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {Array.from({ length: lanes }, (_, i) => (
+            <input
+              key={`s-${i}`}
+              value={startLabels[i] ?? ''}
+              onChange={(e) => updateStartLabel(i, e.target.value)}
+              placeholder={`Start ${i}`}
+              className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500"
+            />
+          ))}
+        </div>
+
+        {/* 캔버스 */}
+        <div ref={containerRef} className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2">
+          <svg width={width} height={height} className="mx-auto block">
+            {/* 세로줄 */}
+            {Array.from({ length: lanes }, (_, i) => (
+              <line
+                key={`v-${i}`}
+                x1={margin + i * colGap}
+                x2={margin + i * colGap}
+                y1={margin}
+                y2={height - margin}
+                stroke="#3f3f46"
+                strokeWidth={3}
+                strokeLinecap="round"
+              />
+            ))}
+
+            {/* 가로줄 */}
+            {rungs.map((r, idx) => (
+              <line
+                key={`h-${idx}`}
+                x1={margin + r.col * colGap}
+                x2={margin + (r.col + 1) * colGap}
+                y1={margin + r.row * rowGap}
+                y2={margin + r.row * rowGap}
+                stroke="#71717a"
+                strokeWidth={4}
+                strokeLinecap="round"
+              />
+            ))}
+
+            {/* 시작 핀 (클릭 시 즉시 진행 또는 애니메이션 시작) */}
+            {Array.from({ length: lanes }, (_, i) => (
+              <g key={`pin-${i}`} className="cursor-pointer" onClick={() => beginFrom(i)}>
+                <circle
+                  cx={margin + i * colGap}
+                  cy={margin - 16}
+                  r={8}
+                  fill={startCol === i ? '#a78bfa' : '#52525b'}
+                />
+                <text
+                  x={margin + i * colGap}
+                  y={margin - 26}
+                  textAnchor="middle"
+                  fontSize="10"
+                  fill="#cbd5e1"
+                >
+                  {i}
+                </text>
+              </g>
+            ))}
+
+            {/* 진행 경로 (재생성 시 숨김 처리됨) */}
+            {path.length > 1 && (
+              <polyline
+                points={path.map((p) => p.join(',')).join(' ')}
+                fill="none"
+                stroke="#a78bfa"
+                strokeWidth={5}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            )}
+
+            {/* 러너 */}
+            {tracer && (
+              <g>
+                <circle cx={tracer.x} cy={tracer.y} r={7} fill="#ffffff" />
+                <circle cx={tracer.x} cy={tracer.y} r={18} fill="rgba(255,255,255,0.15)" />
+              </g>
+            )}
+
+            {/* 도착 인덱스 라벨 */}
+            {Array.from({ length: lanes }, (_, i) => (
+              <text
+                key={`end-${i}`}
+                x={margin + i * colGap}
+                y={height - margin + 18}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#94a3b8"
+              >
+                {i}
+              </text>
+            ))}
+          </svg>
+        </div>
+
+        {/* 라벨 입력 영역 (End) */}
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {Array.from({ length: lanes }, (_, i) => (
+            <input
+              key={`e-${i}`}
+              value={endLabels[i] ?? ''}
+              onChange={(e) => updateEndLabel(i, e.target.value)}
+              placeholder={`End ${i}`}
+              className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500"
+            />
+          ))}
+        </div>
+
+        {/* 상태/결과 바 */}
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-neutral-300">진행 시간 <span className="ml-2 rounded-full bg-neutral-800 px-2 py-0.5 font-mono">{fmtTime(elapsed)}</span></div>
+          <div className="text-sm text-neutral-400">
+            {startCol !== null ? (
+              <>선택: <span className="font-mono text-white">{startLabels[startCol] ?? startCol}</span> → 도착: <span className="font-mono text-white">{endLabels[follow(startCol)] ?? follow(startCol)}</span></>
+            ) : (
+              <>상단 핀을 클릭하면 진행합니다</>
+            )}
+          </div>
+        </div>
+
+        {/* 결과 테이블 (요청: 결과 바로보기/도착 후 표시) */}
+        {showMapping && (
+          <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-800">
+            <div className="bg-neutral-900/60 px-4 py-3 text-sm font-semibold text-white">전체 결과</div>
+            <div className="divide-y divide-neutral-800">
+              {mapping.map((m) => (
+                <div key={m.from} className="grid grid-cols-3 items-center px-4 py-2 text-sm">
+                  <div className="text-neutral-300">
+                    {startLabels[m.from] ?? `Start ${m.from}`}
+                  </div>
+                  <div className="text-center text-neutral-500">→</div>
+                  <div className="text-right text-neutral-300">
+                    {endLabels[m.to] ?? `End ${m.to}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   )
