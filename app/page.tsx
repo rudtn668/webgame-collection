@@ -18,6 +18,12 @@ export default function Home(){
           <h3 style={{marginTop:0}}>AIM 훈련 (30초)</h3>
           <p style={{opacity:.8}}>원형 타겟을 30초간 최대한 많이 맞히세요.</p>
         </a>
+             <a href="/games/ladder" style={{display:'block', padding:'16px', borderRadius:12, background:'#222', color:'#fff'}}>
+          <h3 style={{marginTop:'0', marginBottom:'8px'}}>사다리타기</h3>
+          <p style={{opacity:.8}}>인원수 선택 → 각 칸 입력 → 시작 → 결과 확인</p>
+        </a>
+
+
       </div>
     </main>
   );
