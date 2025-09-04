@@ -5,12 +5,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 // =========================
-// 상단 네비 (로컬 컴포넌트)
+// 상단 네비 (로컬)
 // =========================
 function TopNav() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-
   useEffect(() => setOpen(false), [pathname])
 
   const navItems = [
@@ -90,7 +89,7 @@ function TopNav() {
 }
 
 // =========================
-// 사다리 게임
+// 사다리 페이지
 // =========================
 type Rung = { row: number; col: number }
 
@@ -108,17 +107,17 @@ export default function Page() {
   const [density, setDensity] = useState(0.28)
   const [rungs, setRungs] = useState<Rung[]>([])
 
-  // 라벨 입력 (start/end)
+  // 라벨
   const [startLabels, setStartLabels] = useState<string[]>(() => Array.from({ length: lanes }, (_, i) => `P${i + 1}`))
   const [endLabels, setEndLabels] = useState<string[]>(() => Array.from({ length: lanes }, (_, i) => `A${i + 1}`))
 
   // 애니메이션/결과
-  const [animate, setAnimate] = useState(true) // false면 즉시 결과
+  const [animate, setAnimate] = useState(true)
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [startCol, setStartCol] = useState<number | null>(null)
   const [path, setPath] = useState<Array<[number, number]>>([])
-  const [showMapping, setShowMapping] = useState(false) // 결과 테이블 표시
+  const [showMapping, setShowMapping] = useState(false)
 
   // 반응형
   const containerRef = useRef<HTMLDivElement>(null)
@@ -137,7 +136,7 @@ export default function Page() {
     return () => ro.disconnect()
   }, [])
 
-  // 좌표계
+  // 좌표계 (SVG/입력칸 모두 동일 기준 사용)
   const margin = 40
   const colGap = (width - margin * 2) / (lanes - 1)
   const rowGap = (height - margin * 2) / rows
@@ -156,7 +155,7 @@ export default function Page() {
       }
     }
     setRungs(newRungs)
-    // 요청: 재생성하면 길목(경로) 안 보이게
+    // 요청: 재생성하면 길목(경로) 숨기기
     setPath([])
     setStartCol(null)
     setIsRunning(false)
@@ -204,19 +203,17 @@ export default function Page() {
   } | null>(null)
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
+  const prevTimeRef = useRef<number | null>(null)
 
   const beginFrom = (col: number) => {
-    // 요청: 숫자 누르면 바로 진행 (버튼 없음)
     setShowMapping(false)
     setStartCol(col)
     setElapsed(0)
     setPath([])
 
     if (!animate) {
-      // 즉시 결과 모드
       setIsRunning(false)
       setTracer(null)
-      // 선택 경로 없이 테이블만 보여줌
       setShowMapping(true)
       return
     }
@@ -227,67 +224,73 @@ export default function Page() {
     setTracer({ x: x0, y: y0, col, row: 0, mode: 'down', targetX: x0, targetY: margin + rowGap })
     setIsRunning(true)
     startTimeRef.current = performance.now()
+    prevTimeRef.current = null
   }
 
-  // 러너 진행
+  // 러너 진행 (실시간 deltaSec 사용해 싱크 개선)
   useEffect(() => {
     if (!isRunning || !tracer) return
-    const speedDown = Math.max(180, rowGap * 4)
-    const speedHoriz = Math.max(220, colGap * 4)
+    const speedDown = Math.max(180, rowGap * 4)     // px/s
+    const speedHoriz = Math.max(220, colGap * 4)    // px/s
 
     const tick = (now: number) => {
       if (!startTimeRef.current) startTimeRef.current = now
+      const prev = prevTimeRef.current ?? now
+      const deltaSec = Math.min(0.05, (now - prev) / 1000) // 50ms 캡
+      prevTimeRef.current = now
       setElapsed(now - startTimeRef.current)
 
-      setTracer((prev) => {
-        if (!prev) return prev
-        let { x, y, col, row, mode, targetX, targetY } = prev
-        const dt = 1 / 60
+      setTracer((prevState) => {
+        if (!prevState) return prevState
+        let { x, y, col, row, mode, targetX, targetY } = prevState
 
         if (mode === 'down') {
-          const step = speedDown * dt
-          if (y + step >= targetY) {
+          const step = speedDown * deltaSec
+          if (y + step >= targetY - 0.0001) {
+            // 스냅
             y = targetY
             if (row < rows) {
               if (hasRung(row, col)) {
-                const nx = margin + (col + 1) * colGap
                 mode = 'horiz'
-                targetX = nx
+                targetX = margin + (col + 1) * colGap
               } else if (col - 1 >= 0 && hasRung(row, col - 1)) {
-                const nx = margin + (col - 1) * colGap
                 mode = 'horiz'
-                targetX = nx
+                targetX = margin + (col - 1) * colGap
               } else {
                 row = row + 1
                 if (row > rows - 1) {
-                  // 끝
                   setIsRunning(false)
-                  setShowMapping(true) // 도착 후 결과 표시
+                  setShowMapping(true)
                   return { x, y, col, row, mode, targetX, targetY }
                 }
                 mode = 'down'
                 targetY = margin + (row + 1) * rowGap
               }
             }
-          } else y += step
+          } else {
+            y += step
+          }
         } else {
-          const step = speedHoriz * dt
-          if (Math.abs(targetX - x) <= step) {
+          const step = speedHoriz * deltaSec
+          const dir = Math.sign(targetX - x) || 1
+          if (Math.abs(targetX - x) <= step + 0.0001) {
+            // 스냅
             x = targetX
             col = Math.round((x - margin) / colGap)
             mode = 'down'
             row = row + 1
             if (row > rows - 1) {
               setIsRunning(false)
-              setShowMapping(true) // 도착 후 결과 표시
+              setShowMapping(true)
               return { x, y, col, row, mode, targetX, targetY }
             }
             targetY = margin + (row + 1) * rowGap
           } else {
-            x += Math.sign(targetX - x) * step
+            x += dir * step
           }
         }
 
+        // 경로 누적(중복 포인트 방지)
         setPath((prevPath) => {
           const last = prevPath[prevPath.length - 1]
           const nx = Math.round(x * 100) / 100
@@ -309,7 +312,7 @@ export default function Page() {
     }
   }, [isRunning, tracer, rows, rowGap, colGap])
 
-  // 전체 결과 바로보기
+  // 전체 결과 보기
   const showAllResults = () => {
     setIsRunning(false)
     setTracer(null)
@@ -317,7 +320,6 @@ export default function Page() {
     setShowMapping(true)
   }
 
-  // 입력 핸들러
   const updateStartLabel = (i: number, val: string) =>
     setStartLabels((prev) => prev.map((v, idx) => (idx === i ? val : v)))
   const updateEndLabel = (i: number, val: string) =>
@@ -329,7 +331,7 @@ export default function Page() {
 
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="mb-2 text-2xl font-bold">사다리 타기</h1>
-        <p className="mb-4 text-neutral-300">라벨 입력, 즉시 결과, 클릭 즉시 진행</p>
+        <p className="mb-4 text-neutral-300">라벨 정렬 개선, 애니메이션 싱크 보정</p>
 
         {/* 컨트롤 바 */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -356,21 +358,15 @@ export default function Page() {
 
           <div className="ml-auto flex items-center gap-3">
             <label className="flex select-none items-center gap-2 text-sm text-neutral-300">
-              <input
-                type="checkbox"
-                checked={animate}
-                onChange={(e) => setAnimate(e.target.checked)}
-              />
+              <input type="checkbox" checked={animate} onChange={(e) => setAnimate(e.target.checked)} />
               애니메이션
             </label>
-
             <button
               onClick={regenerate}
               className="rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800"
             >
               사다리 재생성
             </button>
-
             <button
               onClick={showAllResults}
               className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white"
@@ -380,21 +376,32 @@ export default function Page() {
           </div>
         </div>
 
-        {/* 라벨 입력 영역 (Start) */}
-        <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {Array.from({ length: lanes }, (_, i) => (
-            <input
-              key={`s-${i}`}
-              value={startLabels[i] ?? ''}
-              onChange={(e) => updateStartLabel(i, e.target.value)}
-              placeholder={`Start ${i}`}
-              className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500"
-            />
-          ))}
+        {/* === 입력칸 정렬: SVG와 동일 width/margin으로 맞춤 === */}
+        {/* Start 라벨 */}
+        <div className="mx-auto" style={{ width }}>
+          <div className="px-10" style={{ paddingLeft: margin, paddingRight: margin }}>
+            <div
+              className="grid gap-2"
+              style={{
+                gridTemplateColumns: `repeat(${lanes}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({ length: lanes }, (_, i) => (
+                <div key={`s-wrap-${i}`} className="flex flex-col items-center">
+                  <input
+                    value={startLabels[i] ?? ''}
+                    onChange={(e) => updateStartLabel(i, e.target.value)}
+                    placeholder={`Start ${i}`}
+                    className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-center text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 캔버스 */}
-        <div ref={containerRef} className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2">
+        <div ref={containerRef} className="relative mt-2 overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2">
           <svg width={width} height={height} className="mx-auto block">
             {/* 세로줄 */}
             {Array.from({ length: lanes }, (_, i) => (
@@ -424,7 +431,7 @@ export default function Page() {
               />
             ))}
 
-            {/* 시작 핀 (클릭 시 즉시 진행 또는 애니메이션 시작) */}
+            {/* 시작 핀 (클릭 시 즉시 진행) */}
             {Array.from({ length: lanes }, (_, i) => (
               <g key={`pin-${i}`} className="cursor-pointer" onClick={() => beginFrom(i)}>
                 <circle
@@ -445,7 +452,7 @@ export default function Page() {
               </g>
             ))}
 
-            {/* 진행 경로 (재생성 시 숨김 처리됨) */}
+            {/* 진행 경로 */}
             {path.length > 1 && (
               <polyline
                 points={path.map((p) => p.join(',')).join(' ')}
@@ -481,32 +488,50 @@ export default function Page() {
           </svg>
         </div>
 
-        {/* 라벨 입력 영역 (End) */}
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {Array.from({ length: lanes }, (_, i) => (
-            <input
-              key={`e-${i}`}
-              value={endLabels[i] ?? ''}
-              onChange={(e) => updateEndLabel(i, e.target.value)}
-              placeholder={`End ${i}`}
-              className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-500"
-            />
-          ))}
+        {/* End 라벨 (SVG와 동일한 정렬) */}
+        <div className="mx-auto mt-2" style={{ width }}>
+          <div className="px-10" style={{ paddingLeft: margin, paddingRight: margin }}>
+            <div
+              className="grid gap-2"
+              style={{
+                gridTemplateColumns: `repeat(${lanes}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({ length: lanes }, (_, i) => (
+                <div key={`e-wrap-${i}`} className="flex flex-col items-center">
+                  <input
+                    value={endLabels[i] ?? ''}
+                    onChange={(e) => updateEndLabel(i, e.target.value)}
+                    placeholder={`End ${i}`}
+                    className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-center text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 상태/결과 바 */}
         <div className="mt-4 flex items-center justify-between">
-          <div className="text-sm text-neutral-300">진행 시간 <span className="ml-2 rounded-full bg-neutral-800 px-2 py-0.5 font-mono">{fmtTime(elapsed)}</span></div>
+          <div className="text-sm text-neutral-300">
+            진행 시간{' '}
+            <span className="ml-2 rounded-full bg-neutral-800 px-2 py-0.5 font-mono">
+              {fmtTime(elapsed)}
+            </span>
+          </div>
           <div className="text-sm text-neutral-400">
             {startCol !== null ? (
-              <>선택: <span className="font-mono text-white">{startLabels[startCol] ?? startCol}</span> → 도착: <span className="font-mono text-white">{endLabels[follow(startCol)] ?? follow(startCol)}</span></>
+              <>
+                선택: <span className="font-mono text-white">{startLabels[startCol] ?? startCol}</span> → 도착:{' '}
+                <span className="font-mono text-white">{endLabels[follow(startCol)] ?? follow(startCol)}</span>
+              </>
             ) : (
               <>상단 핀을 클릭하면 진행합니다</>
             )}
           </div>
         </div>
 
-        {/* 결과 테이블 (요청: 결과 바로보기/도착 후 표시) */}
+        {/* 전체 결과 */}
         {showMapping && (
           <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-800">
             <div className="bg-neutral-900/60 px-4 py-3 text-sm font-semibold text-white">전체 결과</div>
