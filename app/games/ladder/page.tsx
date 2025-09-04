@@ -1,40 +1,36 @@
 'use client'
 
-// =========================
-// components/TopNav.tsx
-// =========================
-import React from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const navItems = [
-  { href: '/', label: 'Home' },
-  { href: '/games', label: 'Games' },
-  { href: '/games/ladder', label: 'Ladder' },
-]
-
-export function TopNav() {
+// =========================
+// 상단 네비 (파일 내 로컬 컴포넌트)
+// =========================
+function TopNav() {
   const pathname = usePathname()
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpen] = useState(false)
 
-  React.useEffect(() => {
-    setOpen(false) // close on route change
-  }, [pathname])
+  useEffect(() => setOpen(false), [pathname])
+
+  const navItems = [
+    { href: '/', label: 'Home' },
+    { href: '/games', label: 'Games' },
+    { href: '/games/ladder', label: 'Ladder' },
+  ]
 
   return (
     <div className="sticky top-0 z-50 w-full">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 to-transparent" />
       <nav className="mx-auto max-w-6xl rounded-b-2xl border border-neutral-800/60 bg-neutral-900/70 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/50">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="group inline-flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500" />
-              <span className="text-lg font-semibold tracking-tight text-white">Webgame Collection</span>
-            </Link>
-          </div>
+          <Link href="/" className="group inline-flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500" />
+            <span className="text-lg font-semibold tracking-tight text-white">Webgame Collection</span>
+          </Link>
 
-          {/* Desktop menu */}
+          {/* Desktop */}
           <div className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
@@ -43,9 +39,7 @@ export function TopNav() {
                   key={item.href}
                   href={item.href}
                   className={`relative rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                    active
-                      ? 'text-white'
-                      : 'text-neutral-300 hover:text-white'
+                    active ? 'text-white' : 'text-neutral-300 hover:text-white'
                   }`}
                 >
                   {item.label}
@@ -110,12 +104,8 @@ export function TopNav() {
 }
 
 // =========================
-// components/LadderGame.tsx
+// 사다리 게임 (파일 내 로컬 컴포넌트)
 // =========================
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
-
-// 사다리 타입
 type Rung = { row: number; col: number }
 
 function fmtTime(ms: number) {
@@ -125,10 +115,10 @@ function fmtTime(ms: number) {
   return `${mm}:${ss}`
 }
 
-export default function LadderGame() {
-  const [lanes, setLanes] = useState(5) // 세로줄 개수
-  const [rows, setRows] = useState(14) // 가로줄 레벨 수
-  const [density, setDensity] = useState(0.28) // 가로줄 생성 확률
+function LadderGame() {
+  const [lanes, setLanes] = useState(5)
+  const [rows, setRows] = useState(14)
+  const [density, setDensity] = useState(0.28)
   const [rungs, setRungs] = useState<Rung[]>([])
 
   const [startCol, setStartCol] = useState<number | null>(null)
@@ -153,13 +143,13 @@ export default function LadderGame() {
     return () => ro.disconnect()
   }, [])
 
-  // 사다리 생성
+  // 사다리 재생성
   const regenerate = React.useCallback(() => {
     const newRungs: Rung[] = []
     for (let r = 0; r < rows; r++) {
       let prevPlacedAt = -99
       for (let c = 0; c < lanes - 1; c++) {
-        const canPlace = c - prevPlacedAt > 1 // 같은 줄에 인접 가로줄 금지
+        const canPlace = c - prevPlacedAt > 1
         if (canPlace && Math.random() < density) {
           newRungs.push({ row: r, col: c })
           prevPlacedAt = c
@@ -184,29 +174,19 @@ export default function LadderGame() {
   const colGap = (width - margin * 2) / (lanes - 1)
   const rowGap = (height - margin * 2) / rows
 
-  // 빠르게 결과만 계산 (애니메이션 없이)
   const hasRung = (row: number, col: number) => rungs.some((r) => r.row === row && r.col === col)
   const follow = (colStart: number) => {
     let col = colStart
     for (let r = 0; r < rows; r++) {
-      if (hasRung(r, col)) {
-        col = col + 1
-      } else if (col - 1 >= 0 && hasRung(r, col - 1)) {
-        col = col - 1
-      }
+      if (hasRung(r, col)) col = col + 1
+      else if (col - 1 >= 0 && hasRung(r, col - 1)) col = col - 1
     }
-    return col // 도착 컬럼
+    return col
   }
 
   // 애니메이션 상태
   const [tracer, setTracer] = useState<{
-    x: number
-    y: number
-    col: number
-    row: number
-    mode: 'down' | 'horiz'
-    targetX: number
-    targetY: number
+    x: number; y: number; col: number; row: number; mode: 'down' | 'horiz'; targetX: number; targetY: number
   } | null>(null)
   const [path, setPath] = useState<Array<[number, number]>>([])
   const rafRef = useRef<number | null>(null)
@@ -227,8 +207,7 @@ export default function LadderGame() {
   // 러너 진행
   useEffect(() => {
     if (!isRunning || !tracer) return
-
-    const speedDown = Math.max(180, rowGap * 4) // px/s
+    const speedDown = Math.max(180, rowGap * 4)
     const speedHoriz = Math.max(220, colGap * 4)
 
     const tick = (now: number) => {
@@ -238,29 +217,24 @@ export default function LadderGame() {
       setTracer((prev) => {
         if (!prev) return prev
         let { x, y, col, row, mode, targetX, targetY } = prev
+        const dt = 1 / 60
 
-        const dt = 1 / 60 // 60fps 가정
         if (mode === 'down') {
-          const step = (speedDown * dt)
+          const step = speedDown * dt
           if (y + step >= targetY) {
             y = targetY
-            // 가로줄 체크 후 전환
             if (row < rows) {
               if (hasRung(row, col)) {
-                // 오른쪽으로 이동
                 const nx = margin + (col + 1) * colGap
                 mode = 'horiz'
                 targetX = nx
               } else if (col - 1 >= 0 && hasRung(row, col - 1)) {
-                // 왼쪽으로 이동
                 const nx = margin + (col - 1) * colGap
                 mode = 'horiz'
                 targetX = nx
               } else {
-                // 다음 행으로 직진
                 row = row + 1
                 if (row > rows - 1) {
-                  // 끝
                   setIsRunning(false)
                   return { x, y, col, row, mode, targetX, targetY }
                 }
@@ -268,16 +242,12 @@ export default function LadderGame() {
                 targetY = margin + (row + 1) * rowGap
               }
             }
-          } else {
-            y += step
-          }
-        } else if (mode === 'horiz') {
-          const step = (speedHoriz * dt)
+          } else y += step
+        } else {
+          const step = speedHoriz * dt
           if (Math.abs(targetX - x) <= step) {
             x = targetX
-            // 가로 이동 완료 -> 열 변경 후 아래로
-            const newCol = Math.round((x - margin) / colGap)
-            col = newCol
+            col = Math.round((x - margin) / colGap)
             mode = 'down'
             row = row + 1
             if (row > rows - 1) {
@@ -294,9 +264,7 @@ export default function LadderGame() {
           const last = prevPath[prevPath.length - 1]
           const nx = Math.round(x * 100) / 100
           const ny = Math.round(y * 100) / 100
-          if (!last || last[0] !== nx || last[1] !== ny) {
-            return [...prevPath, [nx, ny]]
-          }
+          if (!last || last[0] !== nx || last[1] !== ny) return [...prevPath, [nx, ny]]
           return prevPath
         })
 
@@ -321,11 +289,10 @@ export default function LadderGame() {
     setPath([])
   }
 
-  // 전체 맵핑 미리보기
-  const mapping = useMemo(() => {
-    return Array.from({ length: lanes }, (_, i) => ({ from: i, to: follow(i) }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lanes, rows, rungs])
+  const mapping = useMemo(
+    () => Array.from({ length: lanes }, (_, i) => ({ from: i, to: follow(i) })),
+    [lanes, rows, rungs]
+  )
 
   return (
     <div ref={containerRef} className="mx-auto mt-6 max-w-6xl px-4">
@@ -333,29 +300,19 @@ export default function LadderGame() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-neutral-300">Lanes</span>
           <input
-            type="number"
-            min={2}
-            max={12}
-            value={lanes}
+            type="number" min={2} max={12} value={lanes}
             onChange={(e) => setLanes(Math.min(12, Math.max(2, Number(e.target.value) || 2)))}
             className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
           />
           <span className="text-sm text-neutral-300">Rows</span>
           <input
-            type="number"
-            min={6}
-            max={30}
-            value={rows}
+            type="number" min={6} max={30} value={rows}
             onChange={(e) => setRows(Math.min(30, Math.max(6, Number(e.target.value) || 6)))}
             className="w-20 rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white"
           />
           <span className="text-sm text-neutral-300">Density</span>
           <input
-            type="range"
-            min={0.1}
-            max={0.5}
-            step={0.01}
-            value={density}
+            type="range" min={0.1} max={0.5} step={0.01} value={density}
             onChange={(e) => setDensity(Number(e.target.value))}
             className="h-2 w-40 cursor-pointer"
           />
@@ -369,7 +326,7 @@ export default function LadderGame() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => startCol !== null ? startFrom(startCol) : startFrom(0)}
+            onClick={() => (startCol !== null ? startFrom(startCol) : startFrom(0))}
             disabled={isRunning}
             className="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white disabled:from-neutral-700 disabled:to-neutral-700"
           >
@@ -399,10 +356,9 @@ export default function LadderGame() {
         </motion.div>
       </div>
 
-      {/* 캔버스(SVG) */}
+      {/* 캔버스 */}
       <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2">
         <svg width={width} height={height} className="mx-auto block">
-          {/* 배경 그리드 */}
           <defs>
             <radialGradient id="glow" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
@@ -438,7 +394,7 @@ export default function LadderGame() {
             />
           ))}
 
-          {/* 시작 선택 핀 */}
+          {/* 시작 핀 */}
           {Array.from({ length: lanes }, (_, i) => (
             <g key={`pin-${i}`}>
               <circle
@@ -483,17 +439,16 @@ export default function LadderGame() {
 
           {/* 도착 인덱스 라벨 */}
           {Array.from({ length: lanes }, (_, i) => (
-            <g key={`end-${i}`}>
-              <text
-                x={margin + i * colGap}
-                y={height - margin + 18}
-                textAnchor="middle"
-                fontSize="10"
-                fill="#94a3b8"
-              >
-                {i}
-              </text>
-            </g>
+            <text
+              key={`end-${i}`}
+              x={margin + i * colGap}
+              y={height - margin + 18}
+              textAnchor="middle"
+              fontSize="10"
+              fill="#94a3b8"
+            >
+              {i}
+            </text>
           ))}
         </svg>
       </div>
@@ -504,30 +459,35 @@ export default function LadderGame() {
         <div className="divide-y divide-neutral-800">
           {mapping.map((m) => (
             <div key={m.from} className="grid grid-cols-3 items-center px-4 py-2 text-sm">
-              <div className="text-neutral-300">Start: <span className="font-mono text-white">{m.from}</span></div>
+              <div className="text-neutral-300">
+                Start: <span className="font-mono text-white">{m.from}</span>
+              </div>
               <div className="text-center text-neutral-500">→</div>
-              <div className="text-right text-neutral-300">End: <span className="font-mono text-white">{m.to}</span></div>
+              <div className="text-right text-neutral-300">
+                End: <span className="font-mono text-white">{m.to}</span>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-neutral-500">팁: 위쪽 원형 핀(번호)을 클릭해 시작 지점을 선택하고, “다시 시작”으로 언제든 초기화할 수 있어요.</p>
+      <p className="mt-3 text-xs text-neutral-500">
+        팁: 위쪽 원형 핀(번호)을 클릭해 시작 지점을 선택하고, “다시 시작”으로 언제든 초기화할 수 있어요.
+      </p>
     </div>
   )
 }
 
 // =========================
-// (선택) app/games/ladder/page.tsx 예시
+// 페이지 엔트리
 // =========================
-// 아래 예시는 페이지 파일이 필요할 때 참고용입니다. 프로젝트에 이미 페이지가 있다면 이 블록은 무시하세요.
-export function LadderPageExample() {
+export default function Page() {
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
       <TopNav />
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="mb-2 text-2xl font-bold">사다리 타기</h1>
-        <p className="mb-4 text-neutral-300">애니메이션, 타이머, 전체 매핑 미리보기 지원</p>
+        <p className="mb-4 text-neutral-300">애니메이션, 타이머, 매핑 미리보기 지원</p>
         <LadderGame />
       </section>
     </main>
