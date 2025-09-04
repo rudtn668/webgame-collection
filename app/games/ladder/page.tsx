@@ -287,7 +287,6 @@ export default function Page() {
 
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="mb-2 text-2xl font-bold">사다리 타기</h1>
-        <p className="mb-4 text-neutral-300">입력칸 정렬 + 위치 싱크 수정 + 클릭 즉시 진행</p>
 
         {/* 컨트롤 바 */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
