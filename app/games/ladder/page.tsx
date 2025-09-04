@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/lik";
+import Link from "next/link";
 import type { Rung } from "@/lib/ladder";
 
 type Pair = 
