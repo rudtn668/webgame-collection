@@ -1,10 +1,4 @@
 'use client';
-export const metadata = {
-  title: '반응속도 테스트',
-  description: '신호에 반응해 빠르게 클릭! 낮은 ms일수록 더 좋은 기록입니다.',
-  alternates: { canonical: '/games/reaction' },
-  openGraph: { title: '반응속도 테스트', description: '낮은 ms가 더 좋은 기록입니다.', url: '/games/reaction' },
-};
 
 import { useEffect, useRef, useState } from 'react';
 type Row = { name: string; score: number };
