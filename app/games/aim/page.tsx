@@ -1,11 +1,4 @@
 'use client';
-export const metadata = {
-  title: 'AIM 훈련 (30초)',
-  description: '30초 동안 원형 타겟을 최대한 많이 맞히고 리더보드에 등록하세요.',
-  alternates: { canonical: '/games/aim' },
-  openGraph: { title: 'AIM 훈련 (30초)', description: '타겟을 맞혀 점수를 올리고 리더보드에 도전!', url: '/games/aim' },
-};
-
 
 import { useEffect, useRef, useState } from 'react';
 
