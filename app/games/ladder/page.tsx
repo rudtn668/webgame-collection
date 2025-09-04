@@ -10,19 +10,11 @@ import { usePathname } from 'next/navigation'
 function TopNav() {
   const pathname = usePathname()
   const navItems = [
-    { href: '/', label: 'Home' },
-    { href: '/games', label: 'Games' },
-    { href: '/games/ladder', label: 'Ladder' },
+    { href: '/', label: '← 홈' },
   ]
   return (
     <div className="sticky top-0 z-50 w-full">
       <nav className="mx-auto max-w-6xl border-b border-neutral-800 bg-neutral-900/70 backdrop-blur">
-        <div className="flex items-center justify-between px-4 py-3">
-          <Link href="/" className="group inline-flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500" />
-            <span className="text-lg font-semibold tracking-tight text-white">Webgame Collection</span>
-          </Link>
-          <div className="flex items-center gap-1">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
               return (
